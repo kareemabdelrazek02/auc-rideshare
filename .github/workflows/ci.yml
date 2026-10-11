@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - name: Tests with coverage gate (85% lines)
+        run: npm run test:coverage
+
+  docker:
+    needs: backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t auc-rideshare-api backend
+      - name: Smoke test the container
+        run: |
+          docker run -d --name api -p 3000:3000 \
+            -e JWT_SECRET=ci-secret -e SMS_PROVIDER=textbelt -e TEXTBELT_KEY=unused \
+            -e DATA_STORE=memory -e GEOCODE_ENABLED=false auc-rideshare-api
+          for i in $(seq 1 20); do curl -sf localhost:3000/health && break; sleep 1; done
+          TOKEN=$(curl -sf -X POST localhost:3000/api/auth/register -H 'Content-Type: application/json' \
+            -d '{"aucId":"900000001","firstName":"Ci","lastName":"Bot","phoneNumber":"+201000000001","password":"ci-password"}' \
+            | python3 -c 'import sys,json; print(json.load(sys.stdin)["token"])')
+          curl -sf -X POST localhost:3000/api/rides -H "Authorization: Bearer $TOKEN" | grep -q requested
+      - if: always()
+        run: docker logs api; docker rm -f api

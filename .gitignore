@@ -1,0 +1,16 @@
+node_modules/
+coverage/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+__MACOSX/
+# Firebase / Google service-account keys
+*adminsdk*.json
+serviceAccountKey*.json
+# Flutter
+frontend/**/build/
+frontend/**/.dart_tool/
+frontend/**/.flutter-plugins*
+frontend/**/.packages
